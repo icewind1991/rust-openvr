@@ -16,6 +16,7 @@ pub mod compositor;
 pub mod property;
 pub mod render_models;
 pub mod system;
+pub mod overlay;
 
 pub use tracking::*;
 
@@ -61,6 +62,7 @@ pub struct System(&'static sys::VR_IVRSystem_FnTable);
 pub struct Compositor(&'static sys::VR_IVRCompositor_FnTable);
 pub struct RenderModels(&'static sys::VR_IVRRenderModels_FnTable);
 pub struct Chaperone(&'static sys::VR_IVRChaperone_FnTable);
+pub struct Overlay(&'static sys::VR_IVROverlay_FnTable);
 
 /// Entry points into OpenVR.
 ///
@@ -96,6 +98,9 @@ impl Context {
     }
     pub fn chaperone(&self) -> Result<Chaperone, InitError> {
         load(sys::IVRChaperone_Version).map(|x| unsafe { Chaperone(&*x) })
+    }
+    pub fn overlay(&self) -> Result<Overlay, InitError> {
+        load(sys::IVROverlay_Version).map(|x| unsafe { Overlay(&*x) })
     }
 }
 
