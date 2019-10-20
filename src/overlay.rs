@@ -4,6 +4,7 @@ use std::fmt;
 use std::ffi::{CStr, CString};
 use compositor::Texture;
 use compositor::texture::Handle::{Vulkan, OpenGLTexture, OpenGLRenderBuffer};
+use TrackingUniverseOrigin;
 
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub struct OverlayError(sys::EVROverlayError);
@@ -242,8 +243,16 @@ impl OverlayHandle<'_> {
         OverlayError::from_sys(unsafe { self.sys.SetOverlayTransformTrackedDeviceRelative.unwrap()(self.handle, device, &transform as *const _ as *mut _) })
     }
 
+    fn set_transform_device_absolute(&mut self, universe: TrackingUniverseOrigin, transform: [[f32; 4]; 3]) -> Result<(), OverlayError> {
+        OverlayError::from_sys(unsafe { self.sys.SetOverlayTransformAbsolute.unwrap()(self.handle, universe as u32, &transform as *const _ as *mut _) })
+    }
+
     fn set_from_file(&mut self, path: &CStr) -> Result<(), OverlayError> {
         OverlayError::from_sys(unsafe { self.sys.SetOverlayFromFile.unwrap()(self.handle, path as *const _ as *mut _) })
+    }
+
+    fn clear_texture(&mut self) -> Result<(), OverlayError> {
+        OverlayError::from_sys(unsafe { self.sys.ClearOverlayTexture.unwrap()(self.handle) })
     }
 }
 
@@ -319,12 +328,78 @@ impl FloatingOverlay<'_> {
     pub fn set_from_file(&mut self, path: &CStr) -> Result<(), OverlayError> {
         self.handle.set_from_file(path)
     }
+
+    fn set_transform_device_absolute(&mut self, universe: TrackingUniverseOrigin, transform: [[f32; 4]; 3]) -> Result<(), OverlayError> {
+        self.handle.set_transform_device_absolute(universe, transform)
+    }
+
+    fn clear_texture(&mut self) -> Result<(), OverlayError> {
+        self.handle.clear_texture()
+    }
 }
 
 #[derive(Debug)]
 pub struct DashboardOverlay<'a> {
     handle: OverlayHandle<'a>,
     thumbnail: OverlayHandle<'a>,
+}
+
+impl DashboardOverlay<'_> {
+    pub fn get_key(&self) -> Result<CString, OverlayError> {
+        self.handle.get_key()
+    }
+
+    pub fn get_name(&self) -> Result<CString, OverlayError> {
+        self.handle.get_name()
+    }
+
+    pub fn set_flag(&mut self, flag: OverlayFlag, enabled: bool) -> Result<(), OverlayError> {
+        self.handle.set_flag(flag, enabled)
+    }
+
+    pub fn get_flag(&self, flag: OverlayFlag) -> Result<bool, OverlayError> {
+        self.handle.get_flag(flag)
+    }
+
+    pub fn set_overlay_color(&mut self, red: f32, green: f32, blue: f32) -> Result<(), OverlayError> {
+        self.handle.set_overlay_color(red, green, blue)
+    }
+
+    pub fn set_overlay_alpha(&mut self, alpha: f32) -> Result<(), OverlayError> {
+        self.handle.set_overlay_alpha(alpha)
+    }
+
+    pub fn get_overlay_color(&self) -> Result<(f32, f32, f32), OverlayError> {
+        self.handle.get_overlay_color()
+    }
+
+    pub fn get_overlay_alpha(&self) -> Result<f32, OverlayError> {
+        self.handle.get_overlay_alpha()
+    }
+
+    pub fn set_texture(&mut self, texture: &Texture) -> Result<(), OverlayError> {
+        self.handle.set_texture(texture)
+    }
+
+    pub fn set_overlay_width(&mut self, width: f32) -> Result<(), OverlayError> {
+        self.handle.set_overlay_width(width)
+    }
+
+    pub fn set_from_file(&mut self, path: &CStr) -> Result<(), OverlayError> {
+        self.handle.set_from_file(path)
+    }
+
+    fn clear_texture(&mut self) -> Result<(), OverlayError> {
+        self.handle.clear_texture()
+    }
+
+    pub fn set_thumbnail_from_file(&mut self, path: &CStr) -> Result<(), OverlayError> {
+        self.thumbnail.set_from_file(path)
+    }
+
+    fn clear_thumbnail(&mut self) -> Result<(), OverlayError> {
+        self.thumbnail.clear_texture()
+    }
 }
 
 impl<'a> Overlay<'a> {
@@ -341,7 +416,7 @@ impl<'a> Overlay<'a> {
     }
 
     // Create a new floating overlay
-    pub fn create_dashboard(&self, key: &str, name: &str) -> Result<DashboardOverlay<'a>, OverlayError> {
+    pub fn create_dashboard(&self, key: &CStr, name: &CStr) -> Result<DashboardOverlay<'a>, OverlayError> {
         let mut handle = 0;
         let mut thumbnail = 0;
         OverlayError::from_sys(unsafe { self.0.CreateDashboardOverlay.unwrap()(key.as_ptr() as *mut _, name.as_ptr() as *mut _, &mut handle, &mut thumbnail) })?;
