@@ -130,17 +130,22 @@ pub enum OverlayFlag {
     SendVRSmoothScrollEvents = sys::VROverlayFlags_SendVRSmoothScrollEvents,
 }
 
-unsafe fn get_string_error<F: FnMut(*mut std::os::raw::c_char, &mut u32) -> u32>(mut f: F, max_length: u32) -> Result<CString, OverlayError> {
+unsafe fn get_string_error<F: FnMut(*mut std::os::raw::c_char, u32, &mut u32) -> u32>(mut f: F) -> Result<CString, OverlayError> {
     let mut err = 0;
 
-    let mut storage = Vec::with_capacity(max_length as usize);
-    storage.resize(max_length as usize, 0);
-    let n = f(storage.as_mut_ptr() as *mut _, &mut err);
+    let string = get_string(|ptr, n| {
+        let count = f(ptr, n, &mut err);
+
+        // exit early on errors
+        if err > 0 {
+            0
+        } else {
+            count
+        }
+    });
 
     OverlayError::from_sys(err)?;
-
-    storage.truncate((n - 1) as usize); // Strip trailing null
-    Ok(CString::from_vec_unchecked(storage))
+    Ok(string.unwrap())
 }
 
 #[repr(C)]
@@ -157,16 +162,14 @@ impl fmt::Debug for OverlayHandle<'_> {
 
 impl OverlayHandle<'_> {
     fn get_key(&self) -> Result<CString, OverlayError> {
-        let max = sys::k_unVROverlayMaxKeyLength;
         unsafe {
-            get_string_error(|ptr, err| self.sys.GetOverlayKey.unwrap()(self.handle, ptr, max, err), max)
+            get_string_error(|ptr, n, err| self.sys.GetOverlayKey.unwrap()(self.handle, ptr, n, err))
         }
     }
 
     fn get_name(&self) -> Result<CString, OverlayError> {
-        let max = sys::k_unVROverlayMaxKeyLength;
         unsafe {
-            get_string_error(|ptr, err| self.sys.GetOverlayName.unwrap()(self.handle, ptr, max, err), max)
+            get_string_error(|ptr, n, err| self.sys.GetOverlayName.unwrap()(self.handle, ptr, n, err))
         }
     }
 

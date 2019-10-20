@@ -191,11 +191,10 @@ unsafe fn get_string<F: FnMut(*mut std::os::raw::c_char, u32) -> u32>(mut f: F) 
     if n == 0 {
         return None;
     }
-    let mut storage = Vec::new();
-    storage.reserve_exact(n as usize);
-    storage.resize(n as usize, mem::uninitialized());
+    let mut storage = Vec::with_capacity(n as usize);
+    storage.set_len(n as usize);
     let n_ = f(storage.as_mut_ptr() as *mut _, n);
-    assert!(n == n_);
+    assert_eq!(n, n_);
     storage.truncate((n - 1) as usize); // Strip trailing null
     Some(CString::from_vec_unchecked(storage))
 }
